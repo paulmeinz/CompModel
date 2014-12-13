@@ -1,0 +1,168 @@
+import networkx as nx
+import numpy as np
+import matplotlib.pyplot as plt
+import Nodes as no
+import PlotModelNet as pnet
+
+
+def Model(str, RedCol, GreenCol, RedWord, GreenWord, colorfavor, wordfavor, plot = False, plot2 = False):
+	"""
+	Function for simulating stroop interference effects (Cohen, Dunbar, & Mclelland, 1990)
+	
+	:param str: list of connection strengths between intermediate units and output units [red color name, green color name, red word name, green word name]
+	:param RedCol: boolian whether or not the color red is presented to the simulation
+	:param GreenCol: boolian whether or not the color green is presented to the simulation
+	:param RedWord: boolian whether or not the word red is presented to the simulation
+	:param GreenWord: boolian whether or not the word green is presented to the simulation
+	:colorfavor: boolian whether or not the paricipant is given the instructions to name the ink color of the word and ignore the word's meaning
+	:wordfavor: boolian whether or not the participant is given the instructions to read the word and ignore it's ink coloring.
+	:plot: boolian if True plots nodes and edges of the network.
+	:plot2: boolian if True plots the activation of competing output nodes for each time step in the simulation
+	
+	"""
+
+	#Perceptual/Activation Nodes
+	N1 = no.node(inpc = 10, on = RedCol)
+	N2 = no.node(inpc = 10, on = GreenCol)
+	N5 = no.node(inpc = 10, on = RedWord)
+	N6 = no.node(inpc = 10, on = GreenWord)
+	
+	#Intermediate Nodes and connection strengths
+	N7 = no.node()
+	N7c = str[0]
+	
+	N8 = no.node()
+	N8c = str[1]
+	
+	N9 = no.node()
+	N9c = str[2]
+	
+	N10 = no.node()
+	N10c = str[3]
+	
+	#Output Nodes
+	N11 = no.node()
+	N12 = no.node()
+	
+	#Response Nodes
+	RedWord = 0
+	GreenWord = 0
+	
+	
+	
+	# If demand unit is active, bias resting avg activation to zero where logistic function slope is steepest (nodes 5 and 6)
+
+	if colorfavor:
+		
+		N7.inpc = 0
+		N8.inpc = 0 
+		
+		N7.Activate(), N8.Activate()
+		
+		
+	if wordfavor:
+		
+		N9.inpc = 0
+		N10.inpc = 0
+		
+		N9.Activate(), N10.Activate()
+	
+		
+	
+	#initialize a time variable and a couple other variables for calculations later
+	time = 0
+	sd = .1
+	alpha = .1
+	
+	#a couple of lists for plotting purposes
+	nodelist = [N1,N2,N5,N6,N7,N8,N9,N10,N11,N12]
+	timelist = []
+	N11act = []
+	N12act = []
+		
+	#While an action hasn't been selected
+	while GreenWord < 1.0 and RedWord < 1.0:	
+		time += 1
+		
+		timelist.append(time)
+		N11act.append(N11.act)
+		N12act.append(N12.act)
+	
+		
+		N1.Activate(), N2.Activate(), N5.Activate(), N6.Activate()
+		#Transfer activation from input units to intermediate units
+
+		N7.inp = ((2.6*N1.act) + (-2.6*N2.act))
+		N8.inp = ((-2.6*N1.act) + (2.6*N2.act))
+		N9.inp = ((2.6*N5.act) + (-2.6*N6.act))
+		N10.inp = ((-2.6*N5.act) + (2.6*N6.act))
+		
+		
+		N7.Activate(), N8.Activate(), N9.Activate(), N10.Activate()
+		
+		#Transfer activation from intermediate units to output units
+		N11.inp = ((N7c*N7.act) + (-N8c*N8.act) + (N9c*N9.act) + (-N10c*N10.act))
+		N12.inp = ((-N7c*N7.act) + (N8c*N8.act) + (-N9c*N9.act) + (N10c*N10.act))
+		
+		N11.Activate(), N12.Activate()
+		
+		#Add random variation to response unit based on the activation difference 
+		#between the most active output unit minus the least active output unit
+		
+		if N12.act > N11.act:
+			mean = alpha*(N12.act - N11.act)
+			GreenWord += np.random.normal(mean,sd)
+		
+		if N11.act > N12.act:
+			mean = alpha*(N11.act - N12.act)
+			RedWord += np.random.normal(mean, sd)
+	
+	
+	if plot:
+		pnet.draw_network(nodelist, colorfavor, wordfavor)
+		
+	if plot2:
+		plt.clf()
+		plt.scatter(timelist[1:], N11act[1:], color = 'green')
+		plt.scatter(timelist[1:], N12act[1:], color = 'red')
+		plt.ylabel('Activation')
+		plt.xlabel('Time')
+		plt.show()
+		
+	if RedWord > 1.0:
+		print "red wins"
+		return 'red', time
+	
+	if GreenWord > 1.0:
+		print "green wins"
+		return 'green', time
+	
+
+
+def loop(times, str, RedCol, GreenCol, RedWord, GreenWord, colorfavor, wordfavor, plot = False, plot2 = False):
+	"""
+	Basic loop function for stroop model. NOTE DO NOT SET PLOT FUNCTIONS TO TRUE
+	"""
+	response = []
+	timelist = []
+	
+	#Repeat modeling function N times, save returned response color and time.
+	for time in range(times):
+		
+		resp, time = Model(str, RedCol, GreenCol, RedWord, GreenWord, colorfavor, wordfavor, plot, plot2)
+		
+		response.append(resp)
+		timelist.append(time)
+				
+	print 'red color wins %d times' % response.count('red'), 'green word wins %d times' % response.count('green')
+	print np.mean(timelist)
+
+			
+###modify this line of code to change connection strengths [red color, green color, word red, word green]###
+str = [3.0,5.0,5.0,5.0]
+
+###Modify this line of code to change model parameters###
+Model(str, True, False, False, True, False, False, False, True)
+
+###you can also loop and see how many times the model gives a certain response###
+#loop(10, str, True, False, False, True, True, False) 
